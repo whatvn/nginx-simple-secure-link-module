@@ -211,35 +211,6 @@ static ngx_int_t ngx_http_hmac_secure_link_verify(ngx_http_request_t *r,
     return NGX_OK;
 }
 
-static char *ngx_strcpy(const char *str) {
-    int len = strlen(str) + 1;
-    char *buf = malloc(len);
-    if (NULL == buf)
-        return NULL;
-    memcpy(buf, str, len);
-    return buf;
-}
-
-static ngx_int_t ngx_strsplit(const char *str, char *parts[], const char *delimiter) {
-    char *pch;
-    ngx_int_t i = 0;
-    char *tmp = ngx_strcpy(str);
-    pch = strtok(tmp, delimiter);
-
-    parts[i++] = ngx_strcpy(pch);
-
-    while (pch) {
-        pch = strtok(NULL, delimiter);
-        if (NULL == pch)
-            break;
-        parts[i++] = ngx_strcpy(pch);
-    }
-
-    free(tmp);
-    free(pch);
-    return i;
-}
-
 ngx_int_t
 ngx_http_hmac_secure_link_handler(ngx_http_request_t *r) {
 
@@ -250,8 +221,7 @@ ngx_http_hmac_secure_link_handler(ngx_http_request_t *r) {
     ngx_str_t secure_key;
     u_char *last, *p;
     ngx_str_t favicon_url = ngx_string(FAVICON_URL);
-    ngx_int_t timestamp = 0, expires = 0;
-    char **args;
+    time_t timestamp = 0, expires = 0;
     ngx_int_t rc;
 
 
@@ -290,24 +260,24 @@ ngx_http_hmac_secure_link_handler(ngx_http_request_t *r) {
 
     last = secure_link.data + secure_link.len;
     p = ngx_strlchr(secure_link.data, last, ',');
-
     /* get timestamp value */
     if (p) {
         secure_link.len = p++ - secure_link.data;
-        args = ngx_pcalloc(r->connection->pool, last - p + 1);
-        rc = ngx_strsplit((const char*) p, args, ",");
-        timestamp = atoi(args[0]);
-        if (rc > 0) {
-            expires = atoi(args[1]);
+        if (sscanf((const char*) p, "%d", (int *) &timestamp) < 1) {
+            return NGX_HTTP_FORBIDDEN;
         }
-
+        p = ngx_strlchr(p, last, ',');
+        if (p) {
+            p++;
+            expires = ngx_atotm(p, last - p);
+        }
         /* secure key is the key use to hash*/
         if (ngx_http_complex_value(r, ssf->secure_link_hmac_secret, &secure_key)
                 != NGX_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
-        if (expires != 0) {
+        if (expires > 0) {
             rc = ngx_http_hmac_secure_link_verify(r, &secure_key,
                 &secure_link, &hmac_message) == NGX_OK && timestamp
                 + expires > ngx_time() ? NGX_OK : NGX_HTTP_FORBIDDEN;
@@ -316,7 +286,6 @@ ngx_http_hmac_secure_link_handler(ngx_http_request_t *r) {
                 &secure_link, &hmac_message) == NGX_OK 
                     ? NGX_OK : NGX_HTTP_FORBIDDEN;
         }
-        ngx_pfree(r->connection->pool, args);
         return rc;
     }
     return NGX_HTTP_FORBIDDEN;
