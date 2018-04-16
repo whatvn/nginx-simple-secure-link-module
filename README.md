@@ -42,6 +42,7 @@ secure_link_hmac_message $arg_uid$arg_ts$arg_e;
 
 To generate secure link in php, use following example code: 
 
+### PHP
 
 ```php
 <?php
@@ -58,6 +59,9 @@ $host = "http://github.com";
 $loc = "https://{$host}/downloads/document.pdf?token={$hashmac}&ts={$timestamp}&e={$expire}&uid={$uid}";
 ```
  
+
+
+### Golang
 
 ```go
 func computeHMac(uid, timeStamp, expire int) string {
