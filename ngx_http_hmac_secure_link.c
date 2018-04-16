@@ -264,6 +264,9 @@ ngx_http_hmac_secure_link_handler(ngx_http_request_t *r) {
     if (p) {
         secure_link.len = p++ - secure_link.data;
         if (sscanf((const char*) p, "%d", (int *) &timestamp) < 1) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                              "time stamp error \"%s\"",
+                              (const char*) p);
             return NGX_HTTP_FORBIDDEN;
         }
         p = ngx_strlchr(p, last, ',');
